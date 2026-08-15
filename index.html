@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Silent SOS - GPS Test</title>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        background: #f2f2f2;
+        padding: 20px;
+      }
+
+      .box {
+        background: white;
+        max-width: 500px;
+        margin: auto;
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+      }
+
+      h1 {
+        margin-bottom: 20px;
+      }
+
+      .status {
+        font-size: 20px;
+        margin-bottom: 20px;
+      }
+
+      .data {
+        text-align: left;
+        font-size: 18px;
+        line-height: 2;
+      }
+
+      button {
+        padding: 12px 25px;
+        font-size: 18px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        margin: 10px;
+      }
+
+      #startBtn {
+        background: green;
+        color: white;
+      }
+
+      #stopBtn {
+        background: red;
+        color: white;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="box">
+      <h1>🚨 Silent SOS</h1>
+
+      <div class="status" id="status">GPS: NOT STARTED</div>
+
+      <button id="startBtn" onclick="startGPS()">START GPS</button>
+
+      <button id="stopBtn" onclick="stopGPS()">STOP GPS</button>
+
+      <div class="data">
+        <p>
+          <b>Latitude:</b>
+          <span id="latitude">---</span>
+        </p>
+
+        <p>
+          <b>Longitude:</b>
+          <span id="longitude">---</span>
+        </p>
+
+        <p>
+          <b>Accuracy:</b>
+          <span id="accuracy">---</span>
+        </p>
+
+        <p>
+          <b>Speed:</b>
+          <span id="speed">---</span>
+        </p>
+
+        <p>
+          <b>Last Update:</b>
+          <span id="time">---</span>
+        </p>
+      </div>
+    </div>
+
+    <script>
+      let watchID = null;
+
+      // ======================================
+      // START GPS
+      // ======================================
+
+      function startGPS() {
+        if (!navigator.geolocation) {
+          document.getElementById("status").innerHTML = "❌ GPS not supported";
+
+          return;
+        }
+
+        document.getElementById("status").innerHTML =
+          "🟡 Getting GPS location...";
+
+        watchID = navigator.geolocation.watchPosition(
+          function (position) {
+            let latitude = position.coords.latitude;
+
+            let longitude = position.coords.longitude;
+
+            let accuracy = position.coords.accuracy;
+
+            let speed = position.coords.speed;
+
+            // Display latitude
+            document.getElementById("latitude").innerHTML = latitude.toFixed(6);
+
+            // Display longitude
+            document.getElementById("longitude").innerHTML =
+              longitude.toFixed(6);
+
+            // Display accuracy
+            document.getElementById("accuracy").innerHTML =
+              accuracy.toFixed(2) + " meters";
+
+            // Display speed
+            if (speed !== null) {
+              document.getElementById("speed").innerHTML =
+                speed.toFixed(2) + " m/s";
+            } else {
+              document.getElementById("speed").innerHTML = "0 m/s";
+            }
+
+            // Current time
+            let now = new Date();
+
+            document.getElementById("time").innerHTML =
+              now.toLocaleTimeString();
+
+            document.getElementById("status").innerHTML = "🟢 GPS ACTIVE";
+          },
+
+          function (error) {
+            document.getElementById("status").innerHTML =
+              "❌ GPS ERROR: " + error.message;
+          },
+
+          {
+            enableHighAccuracy: true,
+
+            maximumAge: 0,
+
+            timeout: 10000,
+          },
+        );
+      }
+
+      // ======================================
+      // STOP GPS
+      // ======================================
+
+      function stopGPS() {
+        if (watchID !== null) {
+          navigator.geolocation.clearWatch(watchID);
+
+          watchID = null;
+        }
+
+        document.getElementById("status").innerHTML = "🔴 GPS STOPPED";
+      }
+    </script>
+  </body>
+</html>
