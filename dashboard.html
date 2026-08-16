@@ -1,265 +1,543 @@
+```html
 <!doctype html>
 <html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Silent SOS - Live Tracking Dashboard</title>
 
     <!-- Leaflet -->
     <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    />
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
 
     <style>
-      body {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background: #f2f2f2;
-      }
 
-      .header {
-        background: #111;
-        color: white;
-        padding: 18px;
-        text-align: center;
-      }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+        }
 
-      .header h1 {
-        margin: 0;
-      }
+        .header {
+            background: #111;
+            color: white;
+            padding: 18px;
+            text-align: center;
+        }
 
-      .status {
-        margin-top: 8px;
-        font-size: 18px;
-      }
+        .header h1 {
+            margin: 0;
+        }
 
-      .container {
-        max-width: 1000px;
-        margin: auto;
-        padding: 15px;
-      }
+        .status {
+            margin-top: 8px;
+            font-size: 18px;
+        }
 
-      .info {
-        background: white;
-        padding: 15px;
-        border-radius: 12px;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      }
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            padding: 15px;
+        }
 
-      .row {
-        display: flex;
-        justify-content: space-between;
-        padding: 10px 0;
-        border-bottom: 1px solid #ddd;
-      }
+        .info {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
 
-      .row:last-child {
-        border-bottom: none;
-      }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
 
-      .label {
-        font-weight: bold;
-      }
+        .row:last-child {
+            border-bottom: none;
+        }
 
-      #map {
-        width: 100%;
-        height: 600px;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-      }
+        .label {
+            font-weight: bold;
+        }
+
+        #map {
+            width: 100%;
+            height: 600px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
     </style>
-  </head>
 
-  <body>
-    <div class="header">
-      <h1>🚨 SILENT SOS</h1>
+</head>
 
-      <div class="status" id="status">🟡 CONNECTING TO FIREBASE...</div>
+
+<body>
+
+
+<div class="header">
+
+    <h1>🚨 SILENT SOS</h1>
+
+    <div
+        class="status"
+        id="status">
+        🟡 CONNECTING TO FIREBASE...
     </div>
 
-    <div class="container">
-      <div class="info">
-        <div class="row">
-          <span class="label"> Latitude </span>
+</div>
 
-          <span id="latitude"> --- </span>
-        </div>
 
-        <div class="row">
-          <span class="label"> Longitude </span>
+<div class="container">
 
-          <span id="longitude"> --- </span>
-        </div>
+
+    <div class="info">
 
         <div class="row">
-          <span class="label"> Accuracy </span>
-
-          <span id="accuracy"> --- </span>
+            <span class="label">Latitude</span>
+            <span id="latitude">---</span>
         </div>
+
 
         <div class="row">
-          <span class="label"> Speed </span>
-
-          <span id="speed"> --- </span>
+            <span class="label">Longitude</span>
+            <span id="longitude">---</span>
         </div>
+
 
         <div class="row">
-          <span class="label"> Last Update </span>
-
-          <span id="time"> --- </span>
+            <span class="label">Accuracy</span>
+            <span id="accuracy">---</span>
         </div>
-      </div>
 
-      <div id="map"></div>
+
+        <div class="row">
+            <span class="label">Speed</span>
+            <span id="speed">---</span>
+        </div>
+
+
+        <div class="row">
+            <span class="label">Last Update</span>
+            <span id="time">---</span>
+        </div>
+
+
     </div>
 
-    <!-- Leaflet -->
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div id="map"></div>
 
-    <!-- Firebase -->
 
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+</div>
 
-      import {
+
+<!-- Leaflet -->
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
+
+<!-- Firebase -->
+
+<script type="module">
+
+
+    // =====================================================
+    // FIREBASE IMPORTS
+    // =====================================================
+
+    import {
+        initializeApp
+    }
+    from
+    "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+
+
+    import {
         getDatabase,
         ref,
-        onValue,
-      } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+        onValue
+    }
+    from
+    "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
 
-      // ==========================================
-      // FIREBASE CONFIG
-      // ==========================================
 
-      const firebaseConfig = {
-        apiKey: "AIzaSyC9bJFEZJEDpvZqN1tPbHErH232W1P0PTE",
+    // =====================================================
+    // FIREBASE CONFIG
+    // =====================================================
 
-        authDomain: "silentsos-c3bf9.firebaseapp.com",
+    const firebaseConfig = {
 
-        databaseURL: "https://silentsos-c3bf9-default-rtdb.firebaseio.com",
+        apiKey:
+            "AIzaSyC9bJFEZJEDpvZqN1tPbHErH232W1P0PTE",
 
-        projectId: "silentsos-c3bf9",
+        authDomain:
+            "silentsos-c3bf9.firebaseapp.com",
 
-        storageBucket: "silentsos-c3bf9.firebasestorage.app",
+        databaseURL:
+            "https://silentsos-c3bf9-default-rtdb.firebaseio.com",
 
-        messagingSenderId: "110199256908",
+        projectId:
+            "silentsos-c3bf9",
 
-        appId: "1:110199256908:web:dd6c8a0ecdaeccbe7cc1e9",
+        storageBucket:
+            "silentsos-c3bf9.firebasestorage.app",
 
-        measurementId: "G-ZK3LJ95F1P",
-      };
+        messagingSenderId:
+            "110199256908",
 
-      // ==========================================
-      // FIREBASE INITIALIZATION
-      // ==========================================
+        appId:
+            "1:110199256908:web:dd6c8a0ecdaeccbe7cc1e9",
 
-      const app = initializeApp(firebaseConfig);
+        measurementId:
+            "G-ZK3LJ95F1P"
 
-      const database = getDatabase(app);
+    };
 
-      // ==========================================
-      // LOCATION REFERENCE
-      // ==========================================
 
-      const locationRef = ref(database, "locations/current");
+    // =====================================================
+    // INITIALIZE FIREBASE
+    // =====================================================
 
-      // ==========================================
-      // MAP VARIABLES
-      // ==========================================
+    const app =
+        initializeApp(
+            firebaseConfig
+        );
 
-      let map = null;
 
-      let marker = null;
+    const database =
+        getDatabase(app);
 
-      // ==========================================
-      // LISTEN FOR LOCATION CHANGES
-      // ==========================================
 
-      onValue(
+    // =====================================================
+    // FIREBASE LOCATION
+    // =====================================================
+
+    const locationRef =
+        ref(
+            database,
+            "locations/current"
+        );
+
+
+    // =====================================================
+    // MAP VARIABLES
+    // =====================================================
+
+    let map = null;
+
+    let marker = null;
+
+
+    // =====================================================
+    // LAST LOCATION
+    // =====================================================
+
+    let lastLatitude = null;
+
+    let lastLongitude = null;
+
+
+    // =====================================================
+    // FIREBASE LIVE LISTENER
+    // =====================================================
+
+    onValue(
+
         locationRef,
 
-        function (snapshot) {
-          const data = snapshot.val();
+        function(snapshot)
+        {
 
-          if (!data) {
-            document.getElementById("status").innerHTML = "🔴 NO LOCATION DATA";
+            const data =
+                snapshot.val();
 
-            return;
-          }
 
-          // ======================================
-          // GET DATA
-          // ======================================
+            // ------------------------------------------------
+            // NO DATA
+            // ------------------------------------------------
 
-          const latitude = data.latitude;
+            if (!data)
+            {
 
-          const longitude = data.longitude;
+                document.getElementById(
+                    "status"
+                ).innerHTML =
+                    "🔴 NO LOCATION DATA";
 
-          const accuracy = data.accuracy;
+                return;
 
-          const speed = data.speed;
+            }
 
-          const timestamp = data.timestamp;
 
-          // ======================================
-          // DISPLAY DATA
-          // ======================================
+            // ------------------------------------------------
+            // READ LOCATION
+            // ------------------------------------------------
 
-          document.getElementById("latitude").innerHTML =
-            Number(latitude).toFixed(6);
+            const latitude =
+                Number(
+                    data.latitude
+                );
 
-          document.getElementById("longitude").innerHTML =
-            Number(longitude).toFixed(6);
 
-          document.getElementById("accuracy").innerHTML =
-            Number(accuracy).toFixed(2) + " m";
+            const longitude =
+                Number(
+                    data.longitude
+                );
 
-          document.getElementById("speed").innerHTML =
-            Number(speed).toFixed(2) + " m/s";
 
-          if (timestamp) {
-            document.getElementById("time").innerHTML = new Date(
-              timestamp,
-            ).toLocaleTimeString();
-          }
+            const accuracy =
+                Number(
+                    data.accuracy
+                );
 
-          document.getElementById("status").innerHTML = "🟢 LIVE LOCATION";
 
-          // ======================================
-          // CREATE MAP
-          // ======================================
+            const speed =
+                Number(
+                    data.speed
+                );
 
-          if (map === null) {
-            map = L.map("map").setView([latitude, longitude], 18);
 
-            L.tileLayer(
-              "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            const timestamp =
+                Number(
+                    data.timestamp
+                );
 
-              {
-                maxZoom: 19,
 
-                attribution: "&copy; OpenStreetMap contributors",
-              },
-            ).addTo(map);
+            // ------------------------------------------------
+            // VALIDATE LOCATION
+            // ------------------------------------------------
 
-            marker = L.marker([latitude, longitude]).addTo(map);
+            if (
+                !Number.isFinite(latitude) ||
+                !Number.isFinite(longitude)
+            )
+            {
 
-            marker.bindPopup("📍 LIVE LOCATION").openPopup();
-          }
+                document.getElementById(
+                    "status"
+                ).innerHTML =
+                    "🔴 INVALID LOCATION";
 
-          // ======================================
-          // MOVE MARKER
-          // ======================================
-          else {
-            marker.setLatLng([latitude, longitude]);
+                return;
 
-            map.setView([latitude, longitude]);
-          }
+            }
+
+
+            // ------------------------------------------------
+            // DISPLAY LATITUDE
+            // ------------------------------------------------
+
+            document.getElementById(
+                "latitude"
+            ).innerHTML =
+                latitude.toFixed(6);
+
+
+            // ------------------------------------------------
+            // DISPLAY LONGITUDE
+            // ------------------------------------------------
+
+            document.getElementById(
+                "longitude"
+            ).innerHTML =
+                longitude.toFixed(6);
+
+
+            // ------------------------------------------------
+            // DISPLAY ACCURACY
+            // ------------------------------------------------
+
+            if (
+                Number.isFinite(accuracy)
+            )
+            {
+
+                document.getElementById(
+                    "accuracy"
+                ).innerHTML =
+                    accuracy.toFixed(2)
+                    + " m";
+
+            }
+
+
+            // ------------------------------------------------
+            // DISPLAY SPEED
+            // ------------------------------------------------
+
+            if (
+                Number.isFinite(speed)
+            )
+            {
+
+                document.getElementById(
+                    "speed"
+                ).innerHTML =
+                    speed.toFixed(2)
+                    + " m/s";
+
+            }
+
+
+            // ------------------------------------------------
+            // DISPLAY TIME
+            // ------------------------------------------------
+
+            if (
+                Number.isFinite(timestamp)
+            )
+            {
+
+                document.getElementById(
+                    "time"
+                ).innerHTML =
+                    new Date(
+                        timestamp
+                    ).toLocaleTimeString();
+
+            }
+
+
+            // ------------------------------------------------
+            // STATUS
+            // ------------------------------------------------
+
+            document.getElementById(
+                "status"
+            ).innerHTML =
+                "🟢 LIVE LOCATION";
+
+
+            // =================================================
+            // CREATE MAP
+            // =================================================
+
+            if (
+                map === null
+            )
+            {
+
+                map =
+                    L.map(
+                        "map"
+                    ).setView(
+                        [
+                            latitude,
+                            longitude
+                        ],
+                        18
+                    );
+
+
+                L.tileLayer(
+                    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    {
+
+                        maxZoom: 19,
+
+                        attribution:
+                            "&copy; OpenStreetMap contributors"
+
+                    }
+                ).addTo(map);
+
+
+                marker =
+                    L.marker(
+                        [
+                            latitude,
+                            longitude
+                        ]
+                    ).addTo(map);
+
+
+                marker.bindPopup(
+                    "📍 LIVE LOCATION"
+                ).openPopup();
+
+
+                lastLatitude =
+                    latitude;
+
+
+                lastLongitude =
+                    longitude;
+
+
+                return;
+
+            }
+
+
+            // =================================================
+            // MOVE MARKER ONLY WHEN LOCATION CHANGES
+            // =================================================
+
+            if (
+                latitude !== lastLatitude ||
+                longitude !== lastLongitude
+            )
+            {
+
+                marker.setLatLng(
+                    [
+                        latitude,
+                        longitude
+                    ]
+                );
+
+
+                map.setView(
+                    [
+                        latitude,
+                        longitude
+                    ]
+                );
+
+
+                lastLatitude =
+                    latitude;
+
+
+                lastLongitude =
+                    longitude;
+
+            }
+
         },
-      );
-    </script>
-  </body>
+
+
+        function(error)
+        {
+
+            console.error(
+                "Firebase listener error:",
+                error
+            );
+
+
+            document.getElementById(
+                "status"
+            ).innerHTML =
+                "🔴 FIREBASE ERROR";
+
+        }
+
+    );
+
+
+</script>
+
+
+</body>
 </html>
+```
