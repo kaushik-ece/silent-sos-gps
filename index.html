@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -161,7 +162,6 @@
         initializeApp
     } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
 
-
     import {
         getDatabase,
         ref,
@@ -169,9 +169,9 @@
     } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
 
 
-    // ==========================================
+    // =====================================================
     // FIREBASE CONFIG
-    // ==========================================
+    // =====================================================
 
     const firebaseConfig = {
 
@@ -201,22 +201,26 @@
     };
 
 
-    // ==========================================
-    // START FIREBASE
-    // ==========================================
+    // =====================================================
+    // FIREBASE INITIALIZATION
+    // =====================================================
 
-    const app = initializeApp(firebaseConfig);
+    const app =
+        initializeApp(firebaseConfig);
 
-    const database = getDatabase(app);
+    const database =
+        getDatabase(app);
 
 
-    document.getElementById("firebaseStatus").innerHTML =
+    document.getElementById(
+        "firebaseStatus"
+    ).innerHTML =
         "🟢 FIREBASE CONNECTED";
 
 
-    // ==========================================
+    // =====================================================
     // VARIABLES
-    // ==========================================
+    // =====================================================
 
     let map = null;
 
@@ -224,140 +228,318 @@
 
     let watchID = null;
 
+    let latestLocation = null;
 
-    // ==========================================
-    // START GPS
-    // ==========================================
+    let gpsStarted = false;
 
-    window.startGPS = function()
+
+    // =====================================================
+    // UPDATE MAP
+    // =====================================================
+
+    function updateMap(
+        latitude,
+        longitude
+    )
     {
 
-        if (!navigator.geolocation)
-        {
-            document.getElementById("status").innerHTML =
-                "❌ GPS NOT SUPPORTED";
+        // -------------------------------------------------
+        // CREATE MAP FIRST TIME
+        // -------------------------------------------------
 
+        if (map === null)
+        {
+
+            map =
+                L.map("map").setView(
+                    [
+                        latitude,
+                        longitude
+                    ],
+                    18
+                );
+
+
+            L.tileLayer(
+                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+
+                    maxZoom: 19,
+
+                    attribution:
+                        "&copy; OpenStreetMap contributors"
+
+                }
+            ).addTo(map);
+
+
+            marker =
+                L.marker(
+                    [
+                        latitude,
+                        longitude
+                    ]
+                ).addTo(map);
+
+
+            marker.bindPopup(
+                "📍 Current Location"
+            ).openPopup();
+
+        }
+
+        // -------------------------------------------------
+        // UPDATE EXISTING MAP
+        // -------------------------------------------------
+
+        else
+        {
+
+            marker.setLatLng(
+                [
+                    latitude,
+                    longitude
+                ]
+            );
+
+
+            map.setView(
+                [
+                    latitude,
+                    longitude
+                ]
+            );
+
+        }
+
+    }
+
+
+    // =====================================================
+    // DISPLAY GPS LOCATION
+    // =====================================================
+
+    function displayLocation(
+        latitude,
+        longitude,
+        accuracy,
+        speed
+    )
+    {
+
+        document.getElementById(
+            "latitude"
+        ).innerHTML =
+            latitude.toFixed(6);
+
+
+        document.getElementById(
+            "longitude"
+        ).innerHTML =
+            longitude.toFixed(6);
+
+
+        document.getElementById(
+            "accuracy"
+        ).innerHTML =
+            accuracy.toFixed(2) + " m";
+
+
+        if (speed !== null)
+        {
+
+            document.getElementById(
+                "speed"
+            ).innerHTML =
+                speed.toFixed(2) + " m/s";
+
+        }
+
+        else
+        {
+
+            document.getElementById(
+                "speed"
+            ).innerHTML =
+                "0 m/s";
+
+        }
+
+
+        document.getElementById(
+            "time"
+        ).innerHTML =
+            new Date().toLocaleTimeString();
+
+
+        document.getElementById(
+            "status"
+        ).innerHTML =
+            "🟢 GPS LIVE";
+
+
+        updateMap(
+            latitude,
+            longitude
+        );
+
+    }
+
+
+    // =====================================================
+    // SEND LOCATION TO FIREBASE
+    // =====================================================
+
+    async function sendLocationToFirebase()
+    {
+
+        // No GPS data yet
+        if (
+            latestLocation === null
+        )
+        {
             return;
         }
 
 
-        document.getElementById("status").innerHTML =
-            "🟡 GETTING LOCATION...";
+        const location =
+            latestLocation;
 
 
-        watchID = navigator.geolocation.watchPosition(
+        try
+        {
 
-            async function(position)
+            await set(
+                ref(
+                    database,
+                    "locations/current"
+                ),
+                {
+
+                    latitude:
+                        location.latitude,
+
+                    longitude:
+                        location.longitude,
+
+                    accuracy:
+                        location.accuracy,
+
+                    speed:
+                        location.speed,
+
+                    timestamp:
+                        Date.now()
+
+                }
+            );
+
+
+            document.getElementById(
+                "firebaseStatus"
+            ).innerHTML =
+                "🟢 LOCATION SENT";
+
+
+            console.log(
+                "Firebase location sent:",
+                location.latitude,
+                location.longitude
+            );
+
+        }
+
+        catch(error)
+        {
+
+            console.error(
+                "Firebase error:",
+                error
+            );
+
+
+            document.getElementById(
+                "firebaseStatus"
+            ).innerHTML =
+                "❌ FIREBASE ERROR";
+
+        }
+
+    }
+
+
+    // =====================================================
+    // START GPS
+    // =====================================================
+
+    window.startGPS =
+        function()
+        {
+
+            if (
+                gpsStarted
+            )
+            {
+                return;
+            }
+
+
+            gpsStarted =
+                true;
+
+
+            if (
+                !navigator.geolocation
+            )
             {
 
-                const latitude =
-                    position.coords.latitude;
+                document.getElementById(
+                    "status"
+                ).innerHTML =
+                    "❌ GPS NOT SUPPORTED";
 
-                const longitude =
-                    position.coords.longitude;
+                return;
 
-                const accuracy =
-                    position.coords.accuracy;
-
-                const speed =
-                    position.coords.speed;
+            }
 
 
-                // ======================================
-                // DISPLAY LOCATION
-                // ======================================
-
-                document.getElementById("latitude").innerHTML =
-                    latitude.toFixed(6);
-
-                document.getElementById("longitude").innerHTML =
-                    longitude.toFixed(6);
-
-                document.getElementById("accuracy").innerHTML =
-                    accuracy.toFixed(2) + " m";
+            document.getElementById(
+                "status"
+            ).innerHTML =
+                "🟡 GETTING LOCATION...";
 
 
-                if (speed !== null)
-                {
-                    document.getElementById("speed").innerHTML =
-                        speed.toFixed(2) + " m/s";
-                }
-                else
-                {
-                    document.getElementById("speed").innerHTML =
-                        "0 m/s";
-                }
+            // ------------------------------------------------
+            // START PHONE GPS
+            // ------------------------------------------------
+
+            watchID =
+                navigator.geolocation.watchPosition(
+
+                    function(position)
+                    {
+
+                        const latitude =
+                            position.coords.latitude;
 
 
-                document.getElementById("time").innerHTML =
-                    new Date().toLocaleTimeString();
+                        const longitude =
+                            position.coords.longitude;
 
 
-                document.getElementById("status").innerHTML =
-                    "🟢 GPS LIVE";
+                        const accuracy =
+                            position.coords.accuracy;
 
 
-                // ======================================
-                // CREATE MAP
-                // ======================================
-
-                if (map === null)
-                {
-
-                    map = L.map("map").setView(
-                        [latitude, longitude],
-                        18
-                    );
+                        const speed =
+                            position.coords.speed;
 
 
-                    L.tileLayer(
-                        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                        {
-                            maxZoom: 19,
+                        // ----------------------------------------
+                        // SAVE LATEST GPS READING
+                        // ----------------------------------------
 
-                            attribution:
-                                "&copy; OpenStreetMap contributors"
-                        }
-                    ).addTo(map);
-
-
-                    marker = L.marker(
-                        [latitude, longitude]
-                    ).addTo(map);
-
-
-                    marker.bindPopup(
-                        "📍 Current Location"
-                    ).openPopup();
-
-                }
-                else
-                {
-
-                    marker.setLatLng(
-                        [latitude, longitude]
-                    );
-
-
-                    map.setView(
-                        [latitude, longitude]
-                    );
-
-                }
-
-
-                // ======================================
-                // SEND TO FIREBASE
-                // ======================================
-
-                try
-                {
-
-                    await set(
-                        ref(
-                            database,
-                            "locations/current"
-                        ),
+                        latestLocation =
                         {
 
                             latitude:
@@ -372,61 +554,82 @@
                             speed:
                                 speed !== null
                                 ? speed
-                                : 0,
+                                : 0
 
-                            timestamp:
-                                Date.now()
-
-                        }
-                    );
+                        };
 
 
-                    document.getElementById(
-                        "firebaseStatus"
-                    ).innerHTML =
-                        "🟢 LOCATION SENT";
+                        // ----------------------------------------
+                        // DISPLAY LOCATION
+                        // ----------------------------------------
+
+                        displayLocation(
+                            latitude,
+                            longitude,
+                            accuracy,
+                            speed
+                        );
 
 
-                }
-                catch(error)
-                {
+                        console.log(
+                            "GPS:",
+                            latitude,
+                            longitude,
+                            "Accuracy:",
+                            accuracy
+                        );
 
-                    console.error(error);
-
-                    document.getElementById(
-                        "firebaseStatus"
-                    ).innerHTML =
-                        "❌ FIREBASE ERROR";
-
-                }
-
-            },
+                    },
 
 
-            function(error)
-            {
+                    function(error)
+                    {
 
-                document.getElementById("status").innerHTML =
-                    "❌ GPS ERROR: " + error.message;
+                        document.getElementById(
+                            "status"
+                        ).innerHTML =
+                            "❌ GPS ERROR: " +
+                            error.message;
 
-            },
+
+                        console.error(
+                            "GPS error:",
+                            error
+                        );
+
+                    },
 
 
-            {
+                    {
 
-                enableHighAccuracy: true,
+                        enableHighAccuracy:
+                            true,
 
-                maximumAge: 0,
+                        maximumAge:
+                            0,
 
-                timeout: 10000
+                        timeout:
+                            10000
 
-            }
+                    }
 
-        );
+                );
 
-    };
+
+            // ------------------------------------------------
+            // SEND LATEST LOCATION EVERY 1 SECOND
+            // ------------------------------------------------
+
+            setInterval(
+                sendLocationToFirebase,
+                1000
+            );
+
+        };
+
 
 </script>
 
 </body>
 </html>
+```
