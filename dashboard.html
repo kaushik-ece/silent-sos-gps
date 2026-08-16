@@ -1,0 +1,403 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Silent SOS - Live Tracking Dashboard</title>
+
+    <!-- Leaflet -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #f2f2f2;
+      }
+
+      .header {
+        padding: 18px;
+        text-align: center;
+        color: white;
+        transition: background 0.3s ease;
+      }
+
+      .header.active {
+        background: #b00020;
+      }
+
+      .header.resolved {
+        background: #1b5e20;
+      }
+
+      .header.idle {
+        background: #111;
+      }
+
+      .header h1 {
+        margin: 0;
+      }
+
+      .status {
+        margin-top: 8px;
+        font-size: 18px;
+      }
+
+      .incidentTag {
+        margin-top: 4px;
+        font-size: 12px;
+        opacity: 0.8;
+      }
+
+      .container {
+        max-width: 1000px;
+        margin: auto;
+        padding: 15px;
+      }
+
+      .info {
+        background: white;
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #ddd;
+      }
+
+      .row:last-child {
+        border-bottom: none;
+      }
+
+      .label {
+        font-weight: bold;
+      }
+
+      #map {
+        width: 100%;
+        height: 600px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      button {
+        width: 100%;
+        padding: 15px;
+        margin-bottom: 15px;
+        font-size: 18px;
+        border: none;
+        border-radius: 10px;
+        background: #1b5e20;
+        color: white;
+        display: none;
+      }
+
+      .noId {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="header idle" id="header">
+      <h1>🚨 SILENT SOS</h1>
+
+      <div class="status" id="status">🟡 CONNECTING TO FIREBASE...</div>
+
+      <div class="incidentTag" id="incidentTag">Incident: ---</div>
+    </div>
+
+    <div class="container" id="container">
+      <div class="info">
+        <div class="row">
+          <span class="label">Latitude</span>
+          <span id="latitude">---</span>
+        </div>
+
+        <div class="row">
+          <span class="label">Longitude</span>
+          <span id="longitude">---</span>
+        </div>
+
+        <div class="row">
+          <span class="label">Accuracy</span>
+          <span id="accuracy">---</span>
+        </div>
+
+        <div class="row">
+          <span class="label">Speed</span>
+          <span id="speed">---</span>
+        </div>
+
+        <div class="row">
+          <span class="label">Last Update</span>
+          <span id="time">---</span>
+        </div>
+
+        <div class="row">
+          <span class="label">Trail points</span>
+          <span id="pointCount">0</span>
+        </div>
+      </div>
+
+      <button id="resolveBtn" onclick="markResolved()">
+        ✅ MARK RESOLVED
+      </button>
+
+      <div id="map"></div>
+    </div>
+
+    <!-- Leaflet -->
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Firebase -->
+
+    <script type="module">
+      // =====================================================
+      // FIREBASE IMPORTS
+      // =====================================================
+
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+
+      import {
+        getDatabase,
+        ref,
+        onValue,
+        update,
+      } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+
+      // =====================================================
+      // FIREBASE CONFIG
+      // =====================================================
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyC9bJFEZJEDpvZqN1tPbHErH232W1P0PTE",
+        authDomain: "silentsos-c3bf9.firebaseapp.com",
+        databaseURL: "https://silentsos-c3bf9-default-rtdb.firebaseio.com",
+        projectId: "silentsos-c3bf9",
+        storageBucket: "silentsos-c3bf9.firebasestorage.app",
+        messagingSenderId: "110199256908",
+        appId: "1:110199256908:web:dd6c8a0ecdaeccbe7cc1e9",
+        measurementId: "G-ZK3LJ95F1P",
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const database = getDatabase(app);
+
+      // =====================================================
+      // INCIDENT ID
+      // =====================================================
+      // The dashboard must be opened with ?id=<incidentId> so it only ever
+      // reads the one incident it's authorized for (see database.rules.json —
+      // reading the full incidents list is blocked).
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const incidentId = urlParams.get("id");
+
+      window.currentIncidentId = incidentId;
+
+      if (!incidentId) {
+
+        document.getElementById("container").innerHTML =
+          '<div class="noId">No incident selected.<br>Open this page as ' +
+          '<code>dashboard.html?id=&lt;incidentId&gt;</code> using the link ' +
+          "from the SOS alert.</div>";
+
+        document.getElementById("status").innerHTML = "⚪ NO INCIDENT SELECTED";
+
+      } else {
+
+        document.getElementById("incidentTag").innerHTML =
+          "Incident: " + incidentId;
+
+        runDashboard(incidentId);
+
+      }
+
+      function runDashboard(incidentId) {
+
+        const pointsRef = ref(
+          database,
+          "locations/incidents/" + incidentId + "/points"
+        );
+
+        const metaRef = ref(
+          database,
+          "locations/incidents/" + incidentId + "/meta"
+        );
+
+        // =====================================================
+        // MAP + TRAIL STATE
+        // =====================================================
+
+        let map = null;
+        let marker = null;
+        let trailLine = null;
+        let isActive = null;
+
+        // =====================================================
+        // META LISTENER (active / resolved state)
+        // =====================================================
+
+        onValue(metaRef, function (snapshot) {
+
+          const meta = snapshot.val();
+
+          if (!meta) {
+            return;
+          }
+
+          isActive = meta.active;
+
+          const header = document.getElementById("header");
+          const resolveBtn = document.getElementById("resolveBtn");
+
+          if (meta.active) {
+
+            header.className = "header active";
+            document.getElementById("status").innerHTML = "🔴 SOS ACTIVE";
+            resolveBtn.style.display = "block";
+
+          } else {
+
+            header.className = "header resolved";
+            document.getElementById("status").innerHTML = "✅ RESOLVED / MARKED SAFE";
+            resolveBtn.style.display = "none";
+
+          }
+
+        });
+
+        // =====================================================
+        // POINTS LISTENER (breadcrumb trail)
+        // =====================================================
+
+        onValue(
+          pointsRef,
+
+          function (snapshot) {
+
+            const data = snapshot.val();
+
+            if (!data) {
+              document.getElementById("status").innerHTML = "🟡 WAITING FOR FIRST LOCATION...";
+              return;
+            }
+
+            // Points are stored as { timestamp: {latitude, longitude, ...} }
+            // Sort by timestamp so the trail is drawn in the order it happened.
+            const points = Object.values(data).sort(
+              (a, b) => a.timestamp - b.timestamp
+            );
+
+            const latest = points[points.length - 1];
+
+            const latitude = Number(latest.latitude);
+            const longitude = Number(latest.longitude);
+            const accuracy = Number(latest.accuracy);
+            const speed = Number(latest.speed);
+            const timestamp = Number(latest.timestamp);
+
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+              return;
+            }
+
+            document.getElementById("latitude").innerHTML = latitude.toFixed(6);
+            document.getElementById("longitude").innerHTML = longitude.toFixed(6);
+
+            if (Number.isFinite(accuracy)) {
+              document.getElementById("accuracy").innerHTML = accuracy.toFixed(2) + " m";
+            }
+
+            if (Number.isFinite(speed)) {
+              document.getElementById("speed").innerHTML = speed.toFixed(2) + " m/s";
+            }
+
+            if (Number.isFinite(timestamp)) {
+              document.getElementById("time").innerHTML = new Date(timestamp).toLocaleTimeString();
+            }
+
+            document.getElementById("pointCount").innerHTML = points.length;
+
+            const latLngs = points.map((p) => [Number(p.latitude), Number(p.longitude)]);
+
+            // =================================================
+            // CREATE MAP (first point received)
+            // =================================================
+
+            if (map === null) {
+
+              map = L.map("map").setView([latitude, longitude], 18);
+
+              L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap contributors",
+              }).addTo(map);
+
+              marker = L.marker([latitude, longitude]).addTo(map);
+              marker.bindPopup("📍 LATEST LOCATION").openPopup();
+
+              trailLine = L.polyline(latLngs, {
+                color: "#b00020",
+                weight: 4,
+                opacity: 0.7,
+              }).addTo(map);
+
+              return;
+
+            }
+
+            // =================================================
+            // UPDATE MARKER + TRAIL
+            // =================================================
+
+            marker.setLatLng([latitude, longitude]);
+            map.setView([latitude, longitude]);
+            trailLine.setLatLngs(latLngs);
+
+          },
+
+          function (error) {
+            console.error("Firebase listener error:", error);
+            document.getElementById("status").innerHTML = "🔴 FIREBASE ERROR";
+          }
+        );
+
+        // =====================================================
+        // MARK RESOLVED
+        // =====================================================
+
+        window.markResolved = async function () {
+
+          try {
+
+            await update(metaRef, {
+              active: false,
+              resolvedAt: Date.now(),
+              resolvedBy: "dashboard",
+            });
+
+          } catch (error) {
+
+            console.error("Firebase error:", error);
+
+          }
+
+        };
+
+      }
+    </script>
+  </body>
+</html>

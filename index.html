@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Silent SOS - Live Location</title>
+
+    <!-- Leaflet Map -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <style>
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+        }
+
+        .header {
+            background: #111;
+            color: white;
+            padding: 18px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+        }
+
+        .status {
+            margin-top: 8px;
+            font-size: 18px;
+        }
+
+        .incidentTag {
+            margin-top: 4px;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            padding: 15px;
+        }
+
+        .info {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            font-weight: bold;
+        }
+
+        #map {
+            width: 100%;
+            height: 500px;
+            border-radius: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border: none;
+            border-radius: 10px;
+            color: white;
+        }
+
+        #startBtn {
+            background: green;
+        }
+
+        #stopBtn {
+            background: #b00020;
+            display: none;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="header">
+
+    <h1>🚨 SILENT SOS</h1>
+
+    <div class="status" id="status">
+        GPS: NOT STARTED
+    </div>
+
+    <div class="incidentTag" id="incidentTag">
+        Incident: ---
+    </div>
+
+</div>
+
+
+<div class="container">
+
+    <button id="startBtn" onclick="startGPS()">
+        START LIVE LOCATION
+    </button>
+
+    <button id="stopBtn" onclick="markSafe()">
+        ✅ I AM SAFE - STOP TRACKING
+    </button>
+
+
+    <div class="info">
+
+        <div class="row">
+            <span class="label">Latitude</span>
+            <span id="latitude">---</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Longitude</span>
+            <span id="longitude">---</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Accuracy</span>
+            <span id="accuracy">---</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Speed</span>
+            <span id="speed">---</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Last Update</span>
+            <span id="time">---</span>
+        </div>
+
+        <div class="row">
+            <span class="label">Firebase</span>
+            <span id="firebaseStatus">CONNECTING...</span>
+        </div>
+
+    </div>
+
+
+    <div id="map"></div>
+
+</div>
+
+
+<!-- Leaflet -->
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
+
+<!-- Firebase -->
+
+<script type="module">
+
+    import {
+        initializeApp
+    } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+
+    import {
+        getDatabase,
+        ref,
+        set,
+        update
+    } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+
+
+    // =====================================================
+    // FIREBASE CONFIG
+    // =====================================================
+
+    const firebaseConfig = {
+
+        apiKey:
+            "AIzaSyC9bJFEZJEDpvZqN1tPbHErH232W1P0PTE",
+
+        authDomain:
+            "silentsos-c3bf9.firebaseapp.com",
+
+        databaseURL:
+            "https://silentsos-c3bf9-default-rtdb.firebaseio.com",
+
+        projectId:
+            "silentsos-c3bf9",
+
+        storageBucket:
+            "silentsos-c3bf9.firebasestorage.app",
+
+        messagingSenderId:
+            "110199256908",
+
+        appId:
+            "1:110199256908:web:dd6c8a0ecdaeccbe7cc1e9",
+
+        measurementId:
+            "G-ZK3LJ95F1P"
+    };
+
+
+    // =====================================================
+    // FIREBASE INITIALIZATION
+    // =====================================================
+
+    const app =
+        initializeApp(firebaseConfig);
+
+    const database =
+        getDatabase(app);
+
+
+    document.getElementById(
+        "firebaseStatus"
+    ).innerHTML =
+        "🟢 FIREBASE CONNECTED";
+
+
+    // =====================================================
+    // INCIDENT ID
+    // =====================================================
+    // Every SOS trigger gets its own incident so multiple events never
+    // overwrite each other and each one keeps its own location history.
+    // The ESP32 / SMS link should include ?id=<incidentId>.
+    // If opened without an id (manual testing), a new one is generated.
+
+    const urlParams = new URLSearchParams(window.location.search);
+
+    const incidentId =
+        urlParams.get("id") ||
+        "manual_" + Date.now();
+
+    const autoStart =
+        urlParams.get("id") !== null;
+
+    document.getElementById(
+        "incidentTag"
+    ).innerHTML = "Incident: " + incidentId;
+
+    const incidentRef =
+        ref(database, "locations/incidents/" + incidentId);
+
+    const metaRef =
+        ref(database, "locations/incidents/" + incidentId + "/meta");
+
+    const pointsRef =
+        ref(database, "locations/incidents/" + incidentId + "/points");
+
+
+    // =====================================================
+    // VARIABLES
+    // =====================================================
+
+    let map = null;
+
+    let marker = null;
+
+    let watchID = null;
+
+    let sendIntervalID = null;
+
+    let latestLocation = null;
+
+    let gpsStarted = false;
+
+    let incidentStartTime = null;
+
+
+    // =====================================================
+    // UPDATE MAP
+    // =====================================================
+
+    function updateMap(latitude, longitude) {
+
+        if (map === null) {
+
+            map = L.map("map").setView([latitude, longitude], 18);
+
+            L.tileLayer(
+                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+                    maxZoom: 19,
+                    attribution: "&copy; OpenStreetMap contributors"
+                }
+            ).addTo(map);
+
+            marker = L.marker([latitude, longitude]).addTo(map);
+
+            marker.bindPopup("📍 Current Location").openPopup();
+
+        } else {
+
+            marker.setLatLng([latitude, longitude]);
+
+            map.setView([latitude, longitude]);
+
+        }
+
+    }
+
+
+    // =====================================================
+    // DISPLAY GPS LOCATION
+    // =====================================================
+
+    function displayLocation(latitude, longitude, accuracy, speed) {
+
+        document.getElementById("latitude").innerHTML = latitude.toFixed(6);
+
+        document.getElementById("longitude").innerHTML = longitude.toFixed(6);
+
+        document.getElementById("accuracy").innerHTML = accuracy.toFixed(2) + " m";
+
+        document.getElementById("speed").innerHTML =
+            (speed !== null ? speed.toFixed(2) : "0") + " m/s";
+
+        document.getElementById("time").innerHTML = new Date().toLocaleTimeString();
+
+        document.getElementById("status").innerHTML = "🟢 GPS LIVE";
+
+        updateMap(latitude, longitude);
+
+    }
+
+
+    // =====================================================
+    // SEND LOCATION TO FIREBASE
+    // =====================================================
+    // Each reading is written as its own timestamped point under
+    // points/{timestamp}, so the dashboard can draw a full trail instead
+    // of only ever seeing the latest position.
+
+    async function sendLocationToFirebase() {
+
+        if (latestLocation === null) {
+            return;
+        }
+
+        const location = latestLocation;
+        const now = Date.now();
+
+        if (incidentStartTime === null) {
+            incidentStartTime = now;
+        }
+
+        try {
+
+            // Write this reading as a new point in the trail
+            await set(
+                ref(database, "locations/incidents/" + incidentId + "/points/" + now),
+                {
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    accuracy: location.accuracy,
+                    speed: location.speed,
+                    timestamp: now
+                }
+            );
+
+            // Keep incident metadata (active flag, start time) up to date
+            await update(metaRef, {
+                active: true,
+                startTime: incidentStartTime,
+                lastUpdate: now
+            });
+
+            document.getElementById("firebaseStatus").innerHTML = "🟢 LOCATION SENT";
+
+        } catch (error) {
+
+            console.error("Firebase error:", error);
+
+            document.getElementById("firebaseStatus").innerHTML = "❌ FIREBASE ERROR";
+
+        }
+
+    }
+
+
+    // =====================================================
+    // START GPS
+    // =====================================================
+
+    window.startGPS = function () {
+
+        if (gpsStarted) {
+            return;
+        }
+
+        gpsStarted = true;
+
+        document.getElementById("startBtn").style.display = "none";
+        document.getElementById("stopBtn").style.display = "block";
+
+        if (!navigator.geolocation) {
+            document.getElementById("status").innerHTML = "❌ GPS NOT SUPPORTED";
+            return;
+        }
+
+        document.getElementById("status").innerHTML = "🟡 GETTING LOCATION...";
+
+        watchID = navigator.geolocation.watchPosition(
+
+            function (position) {
+
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+                const speed = position.coords.speed;
+
+                latestLocation = {
+                    latitude: latitude,
+                    longitude: longitude,
+                    accuracy: accuracy,
+                    speed: speed !== null ? speed : 0
+                };
+
+                displayLocation(latitude, longitude, accuracy, speed);
+
+            },
+
+            function (error) {
+
+                document.getElementById("status").innerHTML =
+                    "❌ GPS ERROR: " + error.message;
+
+                console.error("GPS error:", error);
+
+            },
+
+            {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
+            }
+
+        );
+
+        sendIntervalID = setInterval(sendLocationToFirebase, 1000);
+
+    };
+
+
+    // =====================================================
+    // STOP / MARK SAFE
+    // =====================================================
+    // Closes the loop: tells the dashboard this incident is resolved so
+    // responders know the person is safe, and stops draining the phone
+    // battery / writing further points.
+
+    window.markSafe = async function () {
+
+        if (watchID !== null) {
+            navigator.geolocation.clearWatch(watchID);
+        }
+
+        if (sendIntervalID !== null) {
+            clearInterval(sendIntervalID);
+        }
+
+        try {
+
+            await update(metaRef, {
+                active: false,
+                resolvedAt: Date.now()
+            });
+
+            document.getElementById("status").innerHTML = "✅ MARKED SAFE";
+            document.getElementById("stopBtn").style.display = "none";
+
+        } catch (error) {
+
+            console.error("Firebase error:", error);
+
+        }
+
+    };
+
+
+    // =====================================================
+    // AUTO-START
+    // =====================================================
+    // If this page was opened from a real SOS link (?id=... present),
+    // start tracking immediately — someone in distress shouldn't have to
+    // find and tap a button first.
+
+    if (autoStart) {
+        window.startGPS();
+    }
+
+
+</script>
+
+</body>
+</html>
